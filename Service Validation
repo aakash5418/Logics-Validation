@@ -1,0 +1,552 @@
+using System.Collections;
+using System.Text.RegularExpressions;
+using TTRSystem.Core.Models;
+using TTRSystem.Store;
+
+namespace TTRSystem.Service
+{
+    public interface IBookingService
+    {
+        List<Bookings> GetBookingByTrainID(long trainID, DateTimeOffset date);
+        List<Bookings> GetBookingByBookingID(long bookingID, long userID, string password);
+        List<Users> GetUsers(long userID, string password);
+        List<Users> GetUserbyUserID(long UserId);
+        string AddBooking(Passengers passengers);
+        ArrayList AddUser(Users users);
+        string UpdateUser(UpdateUser updateUser);
+        string UpdateBookingStatus(long bookingId);
+        string CancelTicket(long bookingID, long userID, string password);
+        List<TicketCancellation> GetCancelledTicketByTrainID(long trainID);
+    }
+
+    public class BookingService : IBookingService
+    {
+        private readonly IBookingStore bookingStore;
+        private readonly ITrainsStore trainsStore;
+
+        public BookingService(IBookingStore bookingStore, ITrainsStore trainsStore)
+        {
+            this.bookingStore = bookingStore;
+            this.trainsStore = trainsStore;
+        }
+
+        public List<Bookings> GetBookingByTrainID(long trainID, DateTimeOffset date)
+        {
+            var ListofBookings = new List<Bookings>();
+            var trainValidation = ValidateGetBookingbyTrainID(trainID, date);
+            if (trainValidation.Count == 0)
+            {
+                var existenceCheck = trainsStore.GetTrainsByTrainID(trainID);
+                if (existenceCheck.Count != 0)
+                {
+                    var result = this.bookingStore.GetBookingByTrainID(trainID, date);
+                    if (result.Count != 0)
+                    {
+                        return result;
+                    }
+                    else
+                    {
+                        ListofBookings.Add(new Bookings()
+                        {
+                            ErrorMessage = ("TrainId or time is invalid")
+                        });
+                        return ListofBookings;
+                    }
+                }
+                ListofBookings.Add(new Bookings()
+                {
+                    ErrorMessage = ("TrainID Dosen't exist")
+                });
+                return ListofBookings;
+            }
+            else
+            {
+                ListofBookings.Add(new Bookings()
+                {
+                    ErrorMessage = string.Join(",", trainValidation.ToArray())
+                });
+                return ListofBookings;
+            }
+        }
+        public List<Bookings> GetBookingByBookingID(long bookingID, long userID, string password)
+        {
+            var validation = ValidateGetBookingByBookingID(bookingID, userID, password);
+            if (validation.Count == 0)
+            {
+                var user = this.bookingStore.GetUsers(userID, password);
+                if (user.Count > 0)
+                {
+                    var result = this.bookingStore.GetBookingByBookingID(bookingID);
+                    if (result.Count != 0)
+                    {
+                        return result;
+                    }
+                    else
+                    {
+                        var ListofBookings = new List<Bookings>();
+                        ListofBookings.Add(new Bookings()
+                        {
+                            ErrorMessage = "BookingID is invalid"
+                        });
+                        return ListofBookings;
+                    }
+                }
+                else
+                {
+                    var ListofBookings = new List<Bookings>();
+                    ListofBookings.Add(new Bookings()
+                    {
+                        ErrorMessage = " UserId or Password is invalid"
+                    });
+                    return ListofBookings;
+                }
+            }
+            else
+            {
+                var ListofBookings = new List<Bookings>();
+                ListofBookings.Add(new Bookings()
+                {
+                    ErrorMessage = string.Join(",", validation.ToArray())
+                });
+                return ListofBookings;
+            }
+        }
+        public List<Users> GetUsers(long userID, string password)
+        {
+            var Listofusers = new List<Users>();
+            var userValidation = ValidateGetUsers(userID, password);
+            if (userValidation.Count == 0)
+            {
+                var user = this.bookingStore.GetUsers(userID, password);
+                if (user.Count != 0)
+                {
+                    return user;
+                }
+                Listofusers.Add(new Users()
+                {
+                    ErrorMessage = "UserId or Password is invalid"
+                });
+                return Listofusers;
+            }
+            Listofusers.Add(new Users()
+            {
+                ErrorMessage = string.Join(",", userValidation.ToArray())
+            });
+            return Listofusers;
+        }
+        public List<Users> GetUserbyUserID(long userID)
+        {
+            var Listofusers = new List<Users>();
+            if (userID > 0)
+            {
+                var user = this.bookingStore.GetUserbyUserID(userID);
+                if (user.Count != 0)
+                {
+                    return user;
+                }
+                Listofusers.Add(new Users()
+                {
+                    ErrorMessage = "User dosen't Exist"
+                });
+                return Listofusers;
+            }
+            else
+            {
+                Listofusers.Add(new Users()
+                {
+                    ErrorMessage = "UserID is Invalid"
+                }); ;
+            }
+            return Listofusers;
+        }
+        public List<TicketCancellation> GetCancelledTicketByTrainID(long trainID)
+        {
+            var ListofCancelledticket = new List<TicketCancellation>();
+            if (trainID > 0)
+            {
+
+                var TrainExistence = this.trainsStore.GetTrainsByTrainID(trainID);
+                if (TrainExistence.Count != 0)
+                {
+                    var result = this.bookingStore.GetCancelledTicketByTrainID(trainID);
+                    return result;
+                }
+                else
+                {
+                    ListofCancelledticket.Add(new TicketCancellation()
+                    {
+                        ErrorMessage = "TrainID Dosen't exist "
+                    });
+                    return ListofCancelledticket;
+                }
+            }
+            else
+            {
+                ListofCancelledticket.Add(new TicketCancellation()
+                {
+                    ErrorMessage = "TrainID is invalid "
+                });
+            }
+            return ListofCancelledticket;
+        }
+        public string AddBooking(Passengers passengers)
+        {
+            var user = this.bookingStore.GetUsers(passengers.UserID, passengers.Password);
+            if (user.Count != 0)
+            {
+                var userValidation = ValidatePassengers(passengers);
+                if (userValidation.Count == 0)
+                {
+                    var addBooking = this.bookingStore.AddBooking(passengers);
+                    if (!string.IsNullOrEmpty(addBooking))
+                    {
+                        return addBooking;
+                    }
+                    else
+                    {
+                        return "Couldn't able to add booking now";
+                    }
+                }
+                else
+                {
+                    return string.Join(",", userValidation.ToArray());
+                }
+            }
+            else
+            {
+                return "UserId or Password is invalid";
+
+            }
+        }
+        public ArrayList AddUser(Users users)
+        {
+            var userValidation = ValidateAddUsers(users);
+            if (userValidation.Count == 0)
+            {
+                var userExistence = this.bookingStore.GetUserByPhonenumber(users.PhoneNumber);
+                if (userExistence.Count == 0)
+                {
+                    return this.bookingStore.AddUsers(users);
+                }
+                userValidation.Add(" Phone is already associated with another useriD");
+                return userValidation;
+            }
+            return userValidation;  
+        }
+        public string UpdateBookingStatus(long bookingID)
+        {
+            if (bookingID > 0)
+            {
+                var bookingexistence = this.bookingStore.GetBookingByBookingID(bookingID);
+                if (bookingexistence.Count != 0)
+                {
+                    return this.bookingStore.UpdateBookingStatus(bookingID);
+                }
+                else
+                {
+                    return "BookingId dosen't exist";
+                }
+            }
+            else
+            {
+                return "Enter valid BookingId";
+            }
+        }
+        public string UpdateUser(UpdateUser updateUser)
+        {
+            bool passwordisValid = Regex.IsMatch(updateUser.NewPassword, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$");
+            if (updateUser.UserID > 0 && passwordisValid)
+            {
+                var userExistence = this.bookingStore.GetUserbyUserID(updateUser.UserID);
+                if (userExistence.Count != 0)
+                {
+                    var user = this.bookingStore.GetUsers(updateUser.UserID, updateUser.Password);
+                    if (user.Count != 0)
+                    {
+                        return this.bookingStore.UpdateUser(updateUser);
+                    }
+                    else
+                    {
+                        return "UserID or Password is invaild";
+                    }
+                }
+                else
+                {
+                    return "userID dosen't exist";
+                }
+            }
+            else
+            {
+                return "UserID or newPassword is invaild ";
+            }
+        }
+        public string CancelTicket(long bookingID, long userID, string password)
+        {
+            if (bookingID > 0)
+            {
+                var user = this.bookingStore.GetUsers(userID, password);
+                if (user.Count > 0)
+                {
+                    var bookingexistence = this.bookingStore.GetBookingByBookingID(bookingID);
+                    if (bookingexistence.Count != 0)
+                    {
+                        var cancellationExistence = this.bookingStore.GetCancelledTicket(bookingID);
+                        if (cancellationExistence.Count == 0)
+                        {
+                            return this.bookingStore.CancelTicket(bookingID);
+                        }
+                        else
+                        {
+                            return "BookingID already cancelled";
+                        }
+                    }
+                    else
+                    {
+                        return "BookingId dosen't exist";
+                    }
+                }
+                else
+                {
+                    return "UserID or password is incorrect";
+                }
+            }
+            else
+            {
+                return "Enter valid BookingId";
+            }
+        }
+        private ArrayList ValidateAddUsers(Users users)
+        {
+            bool passwordisValid = Regex.IsMatch(users.Password, @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$");
+            bool emailisValid = Regex.IsMatch(users.EmailID, @"^[^@\s]+@gmail\.com$");
+            bool isValid = Regex.IsMatch(users.PhoneNumber, @"^[0-9]{10}$");
+            var errorResult = new ArrayList();
+            if (string.IsNullOrEmpty(users.Name)) { errorResult.Add("Name is invalid"); }
+            else if (string.IsNullOrEmpty(users.Gender)) { errorResult.Add("Gender is invalid"); }
+            else if (string.IsNullOrEmpty(users.Nationality)) { errorResult.Add("Nationality is invalid"); }
+            else if (users.Dateofbirth == null || users.Dateofbirth == DateTime.MinValue) { errorResult.Add("Dateofbirth is invalid"); }
+            else if (string.IsNullOrEmpty(users.PhoneNumber) || !isValid) { errorResult.Add("PhoneNumber is invalid"); }
+            else if (string.IsNullOrEmpty(users.State)) { errorResult.Add("State is invalid"); }
+            else if (string.IsNullOrEmpty(users.City)) { errorResult.Add("City is invalid"); }
+            else if (string.IsNullOrEmpty(users.EmailID) || !emailisValid) { errorResult.Add("EmailID is invalid"); }
+            else if (string.IsNullOrEmpty(users.Password) || !passwordisValid) { errorResult.Add("Password is invalid"); }
+            return errorResult;
+        }
+        private ArrayList ValidateGetBookingByBookingID(long bookingID, long userID, string password)
+        {
+            var errorResult = new ArrayList();
+            if (bookingID == 0) { errorResult.Add("BookingID is invalid"); }
+            else if (userID == 0) { errorResult.Add("EmailID is invalid"); }
+            else if (string.IsNullOrEmpty(password)) { errorResult.Add("Password is invalid"); }
+            return errorResult;
+        }
+        private ArrayList ValidatePassengers(Passengers passengers)
+        {
+            var errorResult = new ArrayList();
+            if (passengers.UserID == 0) { errorResult.Add("UserID is invalid"); }
+            else if (string.IsNullOrEmpty(passengers.Password)) { errorResult.Add("Password is invalid"); }
+            else if (string.IsNullOrEmpty(passengers.Name)) { errorResult.Add("Name is invalid"); }
+            else if (passengers.Age == 0) { errorResult.Add("Age is invalid"); }
+            else if (string.IsNullOrEmpty(passengers.Gender)) { errorResult.Add("Gender is invalid"); }
+            else if (passengers.TrainID == 0) { errorResult.Add("TrainID is invalid"); }
+            else if (string.IsNullOrEmpty(passengers.PhoneNumber)) { errorResult.Add("PhoneNumber is invalid"); }
+            else if (string.IsNullOrEmpty(passengers.Class)) { errorResult.Add("Class is invalid"); }
+            return errorResult;
+        }
+        private ArrayList ValidateGetUsers(long userID, string password)
+        {
+            var errorResult = new ArrayList();
+            if (userID == 0) { errorResult.Add("UserID is invalid"); }
+            else if (string.IsNullOrEmpty(password)) { errorResult.Add("Password is invalid"); }
+            return errorResult;
+        }
+        private ArrayList ValidateGetBookingbyTrainID(long trainID, DateTimeOffset departureDate)
+        {
+            var errorResult = new ArrayList();
+            if (trainID == 0) { errorResult.Add("trainID is invalid"); }
+            else if (departureDate == DateTimeOffset.MinValue || departureDate == null) { errorResult.Add("departureDate is invalid"); }
+            return errorResult;
+        }
+    }
+}
+
+
+
+
+using System.Collections;
+using TTRSystem.Core.Models;
+using TTRSystem.Store;
+
+namespace TTRSystem.Service
+{
+    public interface ITrainsService
+    {
+        List<Trains> GetTrainsByDate(DateTimeOffset? date);
+        List<Trains> GetTrainsByDestination(string? destination);
+        List<Trains> GetTrainsByName(string? destination);
+        List<Trains> GetTrainsByOrigin(string? destination);
+        List<Trains> GetTrainsByOriginAndDestination(string? origin, string? destination, DateTimeOffset? DepartureDate);
+        List<Trains> AddTrain(Trains trains);
+        ArrayList UpdateTrain(Trains trains);
+        string DeleteTrain(long TrainID);
+
+    }
+
+    public class TrainsService : ITrainsService
+    {
+        private readonly ITrainsStore trainsStore;
+
+        public TrainsService(ITrainsStore trainsStore)
+        {
+            this.trainsStore = trainsStore;
+        }
+
+        public List<Trains> GetTrainsByDate(DateTimeOffset? date)
+        {
+            var ListofTrains = new List<Trains>();
+            var result = this.trainsStore.GetTrainsByDate(date);
+            if (result.Count != 0)
+            {
+                return result;
+            }
+            else
+            {
+                ListofTrains.Add(new Trains()
+                {
+                    ErrorMessage = " Date is invalid"
+                });
+                return ListofTrains;
+            }
+        }
+        public List<Trains> GetTrainsByDestination(string? destination)
+        {
+            var ListofTrains = new List<Trains>();
+            var result = this.trainsStore.GetTrainsByDestination(destination);
+            if (result.Count != 0)
+            {
+                return result;
+            }
+            else
+            {
+                ListofTrains.Add(new Trains()
+                {
+                    ErrorMessage = " Destination is invalid"
+                });
+                return ListofTrains;
+            }
+        }
+        public List<Trains> GetTrainsByName(string? trainName)
+        {
+            var ListofTrains = new List<Trains>();
+            var result = this.trainsStore.GetTrainsByName(trainName);
+            if (result.Count != 0)
+            {
+                return result;
+            }
+            else
+            {
+                ListofTrains.Add(new Trains()
+                {
+                    ErrorMessage = " TrainName is invalid"
+                });
+                return ListofTrains;
+            }
+        }
+        public List<Trains> GetTrainsByOrigin(string? origin)
+        {
+            var ListofTrains = new List<Trains>();
+            var result = this.trainsStore.GetTrainsByOrigin(origin);
+            if (result.Count != 0)
+            {
+                return result;
+            }
+            else
+            {
+                ListofTrains.Add(new Trains()
+                {
+                    ErrorMessage = " origin is invalid"
+                });
+                return ListofTrains;
+            }
+        }
+        public List<Trains> GetTrainsByOriginAndDestination(string? origin, string? destination, DateTimeOffset? DepartureDate)
+        {
+            return this.trainsStore.GetTrainsByOriginAndDestination(origin, destination, DepartureDate);
+        }
+        public List<Trains> AddTrain(Trains trains)
+        {
+            var ListofTrains = new List<Trains>();
+            var userValidation = ValidateAddTrains(trains);
+            if (userValidation.Count == 0)
+            {
+                var result = this.trainsStore.AddTrain(trains);
+                if (result.Count != 0)
+                {
+                    return result;
+                }
+                else
+                {
+                    ListofTrains.Add(new Trains()
+                    {
+                        ErrorMessage = " Trainname or DepartureDateandTime or ArrivalDateandTime is invalid"
+                    });
+                }
+                return result;
+            }
+            return ListofTrains;
+        }
+        public ArrayList UpdateTrain(Trains trains)
+        {
+            var userValidation = ValidateUpdateTrains(trains.TrainID);
+            if (userValidation.Count == 0)
+            {
+                var result = this.trainsStore.UpdateTrain(trains);
+                return result;
+            }
+            return userValidation;
+        }
+        public string DeleteTrain(long trainID)
+        {
+            var userValidation = ValidateUpdateTrains(trainID);
+            if (userValidation.Count == 0)
+            {
+                var TrainExistence = this.trainsStore.GetTrainsByTrainID(trainID);
+                if (TrainExistence.Count != 0)
+                {
+                    var result = this.trainsStore.DeleteTrain(trainID);
+                    return result;
+                }
+                else
+                {
+                    return "TrainiD is invalid";
+                }
+            }
+            else
+            {
+                return "trainID is invalid";
+            }
+        }
+        private ArrayList ValidateAddTrains(Trains trains)
+        {
+            var errorResult = new ArrayList();
+            if (string.IsNullOrEmpty(trains.TrainName)) { errorResult.Add("Name is invalid"); }
+            else if (string.IsNullOrEmpty(trains.Destination)) { errorResult.Add("Gender is invalid"); }
+            else if (string.IsNullOrEmpty(trains.Origin)) { errorResult.Add("Nationality is invalid"); }
+            else if (trains.ArrivalDateandTime == null || trains.ArrivalDateandTime == DateTimeOffset.MinValue) { errorResult.Add("State is invalid"); }
+            else if (trains.DepartureDateandTime == null || trains.DepartureDateandTime == DateTimeOffset.MinValue) { errorResult.Add("City is invalid"); }
+            else if (trains.SleeperFare == 0) { errorResult.Add("SleeperFare is invalid"); }
+            else if (trains.SleeperAvailableSeats == 0) { errorResult.Add("SleeperAvailableSeats is invalid"); }
+            else if (trains.SecondClassACFare == 0) { errorResult.Add("SecondClassACFare is invalid"); }
+            else if (trains.SecondClassACAvailableSeats == 0) { errorResult.Add("SecondClassACAvailableSeats is invalid"); }
+            else if (trains.FirstClassAcFare == 0) { errorResult.Add("FirstClassAcFare is invalid"); }
+            else if (trains.FirstClassAcAvailableSeats == 0) { errorResult.Add("FirstClassAcAvailableSeats is invalid"); }
+            return errorResult;
+        }
+        private ArrayList ValidateUpdateTrains(long trainID)
+        {
+            var errorResult = new ArrayList();
+            if (trainID == 0) { errorResult.Add("TrainID is invalid"); }
+            return errorResult;
+        }
+    }
+}
