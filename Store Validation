@@ -1,0 +1,729 @@
+using System.Data;
+using System.Collections;
+using System.Text;
+using Microsoft.Extensions.Configuration;
+using System.Data.SqlClient;
+using TTRSystem.Core.Models;
+
+namespace TTRSystem.Service
+{
+    public interface IBookingStore
+    {
+        List<Bookings> GetBookingByTrainID(long trainID, DateTimeOffset date);
+        string AddBooking(Passengers passengersDirectory);
+        string UpdateBookingStatus(long bookingId);
+        ArrayList AddUsers(Users users);
+        List<Users> GetUsers(long UserId, string Password);
+        List<Users> GetUserbyUserID(long UserId);
+        List<Users> GetUserByPhonenumber(string PhoneNumber);
+        string UpdateUser(UpdateUser updateUser);
+        string CancelTicket(long bookingID);
+        List<Bookings> GetBookingByBookingID(long bookingID);
+        List<TicketCancellation> GetCancelledTicket(long bookingID);
+        List<TicketCancellation> GetCancelledTicketByTrainID(long trainID);
+        int GetSeatAvailability(long trainID, string Department);
+    }
+
+    public class BookingStore : IBookingStore
+    {
+        private readonly IConfiguration config;
+
+        public BookingStore(IConfiguration config)
+        {
+            this.config = config;
+        }
+
+        public List<Bookings> GetBookingByTrainID(long trainID, DateTimeOffset date)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofBookings = new List<Bookings>();
+            using (SqlConnection cn = new(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetBookingByTrainID", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@TrainID", trainID);
+                    sqlcmd.Parameters.AddWithValue("@Departuredate", date);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofBookings.Add(new Bookings()
+                        {
+                            BookingID = (long)reader["BookingID"],
+                            PassengerName = reader["Name"].ToString(),
+                            TrainID = (long)reader["TrainID"],
+                            Class = reader["Class"].ToString(),
+                            Fare = (decimal)reader["Fare"],
+                            BookingStatusID = (int)reader["bookingstatusID"],
+                            DepartureDateandTime = (DateTime)reader["DepartureDateandTime"]
+                        });
+                    }
+                }
+            }
+            return ListofBookings;
+        }
+        public List<Bookings> GetBookingByBookingID(long bookingID)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofBookings = new List<Bookings>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetBookingByBookingID", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@BookingID", bookingID);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofBookings.Add(new Bookings()
+                        {
+                            BookingID = (long)reader["BookingID"],
+                            PassengerName = reader["Name"].ToString(),
+                            TrainName = reader["TrainName"].ToString(),
+                            BookingStatusID = (int)reader["BookingStatusID"],
+                            DepartureDateandTime = (DateTime)reader["DepartureDateandTime"],
+                            Class = reader["Class"].ToString(),
+                            Fare = (decimal)reader["Fare"]
+                        });
+                    }
+                }
+            }
+            return ListofBookings;
+        }
+        public ArrayList AddUsers(Users users)
+        {
+            var encryptedPassword = EncryptPassword(users.Password);
+            string conn = config.GetConnectionString("DBConn");
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("CreateUser", cn))
+                {
+                    cn.Open();
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.Parameters.AddWithValue("@Name", users.Name);
+                    sqlcmd.Parameters.AddWithValue("@Gender", users.Gender);
+                    sqlcmd.Parameters.AddWithValue("@nationality", users.Nationality);
+                    sqlcmd.Parameters.AddWithValue("@dateOfBirth", users.Dateofbirth);
+                    sqlcmd.Parameters.AddWithValue("@Phonenumber", users.PhoneNumber);
+                    sqlcmd.Parameters.AddWithValue("@state", users.State);
+                    sqlcmd.Parameters.AddWithValue("@city", users.City);
+                    sqlcmd.Parameters.AddWithValue("@EmailID", users.EmailID);
+                    sqlcmd.Parameters.AddWithValue("@Password", encryptedPassword);
+                    var iD = (int)(sqlcmd.ExecuteScalar());
+                    cn.Close();
+                    var result = new ArrayList();
+                    result.Add("Your UserId is" + " " + iD);
+                    return result;
+                }
+            }
+        }
+        public string UpdateUser(UpdateUser updateUser)
+        {
+            var encryptedPassword = string.IsNullOrEmpty(updateUser.NewPassword) ? null : EncryptPassword(updateUser.NewPassword);
+            string conn = config.GetConnectionString("DBConn");
+            DateTime? dateTimeValue = null;
+            var dateofBirth = updateUser.Dateofbirth == DateTime.MinValue ? dateTimeValue : updateUser.Dateofbirth;
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("UpdateUser", cn))
+                {
+                    cn.Open();
+                    sqlcmd.Parameters.AddWithValue("@userID", updateUser.UserID);
+                    sqlcmd.Parameters.AddWithValue("@Password", encryptedPassword ?? null);
+                    sqlcmd.Parameters.AddWithValue("@Name", updateUser.Name ?? null);
+                    sqlcmd.Parameters.AddWithValue("@Gender", updateUser.Gender ?? null);
+                    sqlcmd.Parameters.AddWithValue("@nationality", updateUser.Nationality ?? null);
+                    sqlcmd.Parameters.AddWithValue("@dateOfBirth", dateofBirth);
+                    sqlcmd.Parameters.AddWithValue("@Phonenumber", updateUser.PhoneNumber ?? null);
+                    sqlcmd.Parameters.AddWithValue("@state", updateUser.State ?? null);
+                    sqlcmd.Parameters.AddWithValue("@city", updateUser.City ?? null);
+                    sqlcmd.Parameters.AddWithValue("@EmailID", updateUser.EmailID ?? null);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.ExecuteNonQuery();
+                    cn.Close();
+                }
+            }
+            return "UserID" + " " + updateUser.UserID + " " + " Upated Successfully";
+        }
+        public static string EncryptPassword(string password)
+        {
+            if (string.IsNullOrEmpty(password))
+            {
+                return null;
+            }
+            else
+            {
+                byte[] storedPassword = ASCIIEncoding.ASCII.GetBytes(password);
+                string encryptedPassword = Convert.ToBase64String(storedPassword);
+                return encryptedPassword;
+            }
+        }
+        public static string DecryptPassword(string password)
+        {
+            if (string.IsNullOrEmpty(password))
+            {
+                return null;
+            }
+            else
+            {
+                byte[] encryptedPassword = Convert.FromBase64String(password);
+                string decryptedPassword = ASCIIEncoding.ASCII.GetString(encryptedPassword);
+                return decryptedPassword;
+            }
+        }
+        public List<Users> GetUsers(long UserId, string password)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var Listofusers = new List<Users>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetUser", cn))
+                {
+                    var encryptedPassword = EncryptPassword(password);
+                    sqlcmd.Parameters.AddWithValue("@UserID", UserId);
+                    sqlcmd.Parameters.AddWithValue("@Password", encryptedPassword);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        DateTime? dateTimeValue = null;
+                        var encryptPassword = reader["Password"].ToString();
+                        var decryptedPassword = DecryptPassword(encryptPassword);
+                        Listofusers.Add(new Users()
+                        {
+                            UserID = (long)reader["UserID"],
+                            Name = (string)reader["Name"],
+                            Gender = (string)reader["Gender"],
+                            Nationality = (string)reader["Nationality"],
+                            Dateofbirth = (DateTime)reader["dateofBirth"],
+                            PhoneNumber = (string)reader["PhoneNumber"],
+                            State = (string)reader["state"],
+                            City = (string)reader["City"],
+                            EmailID = (string)reader["emailID"],
+                            Createddate = (DateTime)reader["CreatedDate"],
+                            Modifieddate = reader.IsDBNull("Modifieddate") ? dateTimeValue : (DateTime)reader["Modifieddate"],
+                            Password = decryptedPassword
+                        });
+                    }
+                }
+            }
+            return Listofusers;
+        }
+        public List<Users> GetUserbyUserID(long UserId)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var Listofusers = new List<Users>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetUserbyUserID", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@UserID", UserId);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        DateTime? dateTimeValue = null;
+                        var encryptPassword = reader["Password"].ToString();
+                        var decryptedPassword = DecryptPassword(encryptPassword);
+                        Listofusers.Add(new Users()
+                        {
+                            UserID = (long)reader["UserID"],
+                            Name = (string)reader["Name"],
+                            Gender = (string)reader["Gender"],
+                            Nationality = (string)reader["Nationality"],
+                            Dateofbirth = (DateTime)reader["dateofBirth"],
+                            PhoneNumber = (string)reader["PhoneNumber"],
+                            State = (string)reader["state"],
+                            City = (string)reader["City"],
+                            EmailID = (string)reader["emailID"],
+                            Createddate = (DateTime)reader["CreatedDate"],
+                            Modifieddate = reader.IsDBNull("Modifieddate") ? dateTimeValue : (DateTime)reader["Modifieddate"],
+                            Password = decryptedPassword
+                        });
+                    }
+                }
+            }
+            return Listofusers;
+        }
+        public List<TicketCancellation> GetCancelledTicket(long bookingID)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofCancelledticket = new List<TicketCancellation>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetCancelledTicket", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@bookingID", bookingID);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofCancelledticket.Add(new TicketCancellation()
+                        {
+                            BookingID = (long)reader["BookingID"]
+                        });
+                    }
+                }
+            }
+            return ListofCancelledticket;
+        }
+        public int GetSeatAvailability(long trainID, string Department)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var availableSeats = 0;
+            var ListofCancelledticket = new List<TicketCancellation>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetCancelledTickets", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@Department", Department);
+                    sqlcmd.Parameters.AddWithValue("@trainID", trainID);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        availableSeats = (int)reader["AvailableSeats"];
+                    }
+                    return availableSeats;
+                }
+            }
+        }
+        public List<TicketCancellation> GetCancelledTicketByTrainID(long trainID)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofCancelledticket = new List<TicketCancellation>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetCancelledTicketByTrainID", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@TrainID", trainID);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofCancelledticket.Add(new TicketCancellation()
+                        {
+                            CancellationID = (long)reader["CancellationID"],
+                            BookingID = (long)reader["BookingID"],
+                            Cancellationdate = (DateTime)reader["Cancellationdate"],
+                            Returnedfare = (decimal)reader["Returnedfare"],
+                            TrainID = (long)reader["TrainID"],
+                            PassengerID = (long)reader["PassengerID"],
+                            BookingStatusID = (int)reader["BookingStatusID"],
+                            Fare = (decimal)reader["fare"],
+                            Class = (string)reader["Class"],
+                            DepartureDateandTime = (DateTime)reader["DepartureDateandTime"],
+                        });
+                    }
+                }
+            }
+            return ListofCancelledticket;
+        }
+        public List<Users> GetUserByPhonenumber(string PhoneNumber)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var Listofusers = new List<Users>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("CheckUserbyPhonenumber", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@PhoneNumber", PhoneNumber);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        Listofusers.Add(new Users()
+                        {
+                            UserID = (long)reader["UserID"],
+                        });
+                    }
+                }
+            }
+            return Listofusers;
+        }
+        public string AddBooking(Passengers passengers)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("UpsertBooking", cn))
+                {
+                    cn.Open();
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.Parameters.AddWithValue("@Name", passengers.Name);
+                    sqlcmd.Parameters.AddWithValue("@Age", passengers.Age);
+                    sqlcmd.Parameters.AddWithValue("@Gender", passengers.Gender);
+                    sqlcmd.Parameters.AddWithValue("@Phonenumber", passengers.PhoneNumber);
+                    sqlcmd.Parameters.AddWithValue("@TrainID", passengers.TrainID);
+                    sqlcmd.Parameters.AddWithValue("@Class", passengers.Class);
+                    var iD = (long)(sqlcmd.ExecuteScalar());
+                    cn.Close();
+                    var result = "Your BookingID is" + " " + iD;
+                    return result;
+                }
+            }
+        }
+        public string UpdateBookingStatus(long bookingId)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("UpdateBookingStatus", cn))
+                {
+                    cn.Open();
+                    sqlcmd.Parameters.AddWithValue("@BookingID", bookingId);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.ExecuteNonQuery();
+                    cn.Close();
+                }
+            }
+            return "Booking Status Upated Successfully";
+        }
+
+        public string CancelTicket(long bookingID)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("TicketCancellation", cn))
+                {
+                    cn.Open();
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.Parameters.AddWithValue("@BookingID", bookingID);
+                    var fare = ((decimal)sqlcmd.ExecuteScalar());
+                    var result = "returned fare is" + " " + fare;
+                    cn.Close();
+                    return result;
+                }
+            }
+        }
+
+    }
+}
+
+
+
+using TTRSystem.Core.Models;
+using System.Data;
+using System.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using System.Collections;
+
+namespace TTRSystem.Store
+{
+    public interface ITrainsStore
+    {
+        List<Trains> GetTrainsByDate(DateTimeOffset? date);
+        List<Trains> GetTrainsByDestination(string? destination);
+        List<Trains> GetTrainsByName(string? trainName);
+        List<Trains> GetTrainsByTrainID(long? TrainID);
+        List<Trains> GetTrainsByOrigin(string? origin);
+        List<Trains> GetTrainsByOriginAndDestination(string? origin, string? destination, DateTimeOffset? DepartureDate);
+        List<Trains> AddTrain(Trains trains);
+        ArrayList UpdateTrain(Trains trains);
+        string DeleteTrain(long trainID);
+    }
+
+    public class TrainsStore : ITrainsStore
+    {
+        private readonly IConfiguration config;
+
+        public TrainsStore(IConfiguration config)
+        {
+            this.config = config;
+        }
+
+        public List<Trains> GetTrainsByDate(DateTimeOffset? date)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofTrains = new List<Trains>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetTrainsBydate", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@Date", date.HasValue ? date : DBNull.Value);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofTrains.Add(new Trains()
+                        {
+                            TrainID = (long)reader["trainID"],
+                            TrainName = reader["trainName"].ToString(),
+                            Origin = reader["origin"].ToString(),
+                            Destination = reader["destination"].ToString(),
+                            SecondClassACFare = (decimal)reader["SecondClassAcfare"],
+                            SecondClassACAvailableSeats = (int)reader["SecondClassACAvailableSeats"],
+                            FirstClassAcFare = (decimal)reader["FirstClassAcFare"],
+                            FirstClassAcAvailableSeats = (int)reader["FirstClassAcAvailableSeats"],
+                            SleeperAvailableSeats = (int)reader["SleeperAvailableSeats"],
+                            SleeperFare = (decimal)reader["SleeperFare"],
+                            ArrivalDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"],
+                            DepartureDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"]
+                        });
+                    }
+                }
+            }
+            return ListofTrains;
+        }
+        public List<Trains> GetTrainsByTrainID(long? trainID)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofTrains = new List<Trains>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetTrainsByTrainID", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@TrainID", trainID);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofTrains.Add(new Trains()
+                        {
+                            TrainID = (long)reader["trainID"],
+                            TrainName = reader["trainName"].ToString(),
+                            Origin = reader["origin"].ToString(),
+                            Destination = reader["destination"].ToString(),
+                            SecondClassACFare = (decimal)reader["SecondClassAcfare"],
+                            SecondClassACAvailableSeats = (int)reader["SecondClassACAvailableSeats"],
+                            FirstClassAcFare = (decimal)reader["FirstClassAcFare"],
+                            FirstClassAcAvailableSeats = (int)reader["FirstClassAcAvailableSeats"],
+                            SleeperAvailableSeats = (int)reader["SleeperAvailableSeats"],
+                            SleeperFare = (decimal)reader["SleeperFare"],
+                            ArrivalDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"],
+                            DepartureDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"]
+                        });
+                    }
+                }
+            }
+            return ListofTrains;
+        }
+        public List<Trains> GetTrainsByDestination(string? destination)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofTrains = new List<Trains>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetTrainsBydestination", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@Destination", string.IsNullOrEmpty(destination) ? DBNull.Value : destination);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofTrains.Add(new Trains()
+                        {
+                            TrainID = (long)reader["trainID"],
+                            TrainName = reader["trainName"].ToString(),
+                            Origin = reader["origin"].ToString(),
+                            Destination = reader["destination"].ToString(),
+                            SecondClassACFare = (decimal)reader["SecondClassAcfare"],
+                            SecondClassACAvailableSeats = (int)reader["SecondClassACAvailableSeats"],
+                            FirstClassAcFare = (decimal)reader["FirstClassAcFare"],
+                            FirstClassAcAvailableSeats = (int)reader["FirstClassAcAvailableSeats"],
+                            SleeperAvailableSeats = (int)reader["SleeperAvailableSeats"],
+                            SleeperFare = (decimal)reader["SleeperFare"],
+                            ArrivalDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"],
+                            DepartureDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"]
+                        });
+                    }
+                }
+            }
+            return ListofTrains;
+        }
+        public List<Trains> GetTrainsByName(string? trainName)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofTrains = new List<Trains>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetTrainsByTrainName", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@TrainName", string.IsNullOrEmpty(trainName) ? DBNull.Value : trainName);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofTrains.Add(new Trains()
+                        {
+                            TrainID = (long)reader["trainID"],
+                            TrainName = reader["trainName"].ToString(),
+                            Origin = reader["origin"].ToString(),
+                            Destination = reader["destination"].ToString(),
+                            SecondClassACFare = (decimal)reader["SecondClassAcfare"],
+                            SecondClassACAvailableSeats = (int)reader["SecondClassACAvailableSeats"],
+                            FirstClassAcFare = (decimal)reader["FirstClassAcFare"],
+                            FirstClassAcAvailableSeats = (int)reader["FirstClassAcAvailableSeats"],
+                            SleeperAvailableSeats = (int)reader["SleeperAvailableSeats"],
+                            SleeperFare = (decimal)reader["SleeperFare"],
+                            ArrivalDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"],
+                            DepartureDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"]
+                        });
+                    }
+                }
+            }
+            return ListofTrains;
+        }
+        public List<Trains> GetTrainsByOrigin(string? origin)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofTrains = new List<Trains>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetTrainsByorigin", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@origin", string.IsNullOrEmpty(origin) ? DBNull.Value : origin);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofTrains.Add(new Trains()
+                        {
+                            TrainID = (long)reader["trainID"],
+                            TrainName = reader["trainName"].ToString(),
+                            Origin = reader["origin"].ToString(),
+                            Destination = reader["destination"].ToString(),
+                            SecondClassACFare = (decimal)reader["SecondClassAcfare"],
+                            SecondClassACAvailableSeats = (int)reader["SecondClassACAvailableSeats"],
+                            FirstClassAcFare = (decimal)reader["FirstClassAcFare"],
+                            FirstClassAcAvailableSeats = (int)reader["FirstClassAcAvailableSeats"],
+                            SleeperAvailableSeats = (int)reader["SleeperAvailableSeats"],
+                            SleeperFare = (decimal)reader["SleeperFare"],
+                            ArrivalDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"],
+                            DepartureDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"]
+                        });
+                    }
+                }
+            }
+            return ListofTrains;
+        }
+        public List<Trains> GetTrainsByOriginAndDestination(string? origin, string? destination, DateTimeOffset? departureDate)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            var ListofTrains = new List<Trains>();
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("GetTrainsByOriginAndDestination", cn))
+                {
+                    sqlcmd.Parameters.AddWithValue("@origin", string.IsNullOrEmpty(origin) ? DBNull.Value : origin);
+                    sqlcmd.Parameters.AddWithValue("@destination", string.IsNullOrEmpty(destination) ? DBNull.Value : destination);
+                    sqlcmd.Parameters.AddWithValue("@DepartureDateandTime", departureDate.HasValue ? departureDate : DBNull.Value);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    cn.Open();
+                    SqlDataReader reader = sqlcmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        ListofTrains.Add(new Trains()
+                        {
+                            TrainID = (long)reader["trainID"],
+                            TrainName = reader["trainName"].ToString(),
+                            Origin = reader["origin"].ToString(),
+                            Destination = reader["destination"].ToString(),
+                            SecondClassACFare = (decimal)reader["SecondClassAcfare"],
+                            SecondClassACAvailableSeats = (int)reader["SecondClassACAvailableSeats"],
+                            FirstClassAcFare = (decimal)reader["FirstClassAcFare"],
+                            FirstClassAcAvailableSeats = (int)reader["FirstClassAcAvailableSeats"],
+                            SleeperAvailableSeats = (int)reader["SleeperAvailableSeats"],
+                            SleeperFare = (decimal)reader["SleeperFare"],
+                            ArrivalDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"],
+                            DepartureDateandTime = (DateTimeOffset)reader["ArrivalDateandTime"]
+                        });
+                    }
+                }
+            }
+            return ListofTrains;
+        }
+        public List<Trains> AddTrain(Trains trains)
+        {
+            var ListofTrains = new List<Trains>();
+            string conn = config.GetConnectionString("DBConn");
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("AddTrain", cn))
+                {
+                    cn.Open();
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.Parameters.AddWithValue("@TrainName", trains.TrainName);
+                    sqlcmd.Parameters.AddWithValue("@Destination", trains.Destination);
+                    sqlcmd.Parameters.AddWithValue("@Origin", trains.Origin);
+                    sqlcmd.Parameters.AddWithValue("@ArrivalDateandTime", trains.ArrivalDateandTime);
+                    sqlcmd.Parameters.AddWithValue("@DepartureDateandTime", trains.DepartureDateandTime);
+                    sqlcmd.Parameters.AddWithValue("@SleeperFare", trains.SleeperFare);
+                    sqlcmd.Parameters.AddWithValue("@SleeperAvailableseats", trains.SleeperAvailableSeats);
+                    sqlcmd.Parameters.AddWithValue("@SecondClassACFare", trains.SecondClassACFare);
+                    sqlcmd.Parameters.AddWithValue("@SecondClassAcAvailableseats", trains.SecondClassACAvailableSeats);
+                    sqlcmd.Parameters.AddWithValue("@FirstClassAcFare", trains.FirstClassAcFare);
+                    sqlcmd.Parameters.AddWithValue("@FirstClassACAvailableseats", trains.FirstClassAcAvailableSeats);
+                    sqlcmd.ExecuteScalar();
+                    cn.Close();
+                }
+            }
+            ListofTrains.Add(new Trains()
+            {
+                ErrorMessage = trains.TrainName + " is added "
+            });
+            return ListofTrains;
+        }
+        public ArrayList UpdateTrain(Trains trains)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("UpdateTrain", cn))
+                {
+                    cn.Open();
+                    sqlcmd.Parameters.AddWithValue("@TrainID", trains.TrainID);
+                    sqlcmd.Parameters.AddWithValue("@TrainName", trains.TrainName);
+                    sqlcmd.Parameters.AddWithValue("@Destination", trains.Destination);
+                    sqlcmd.Parameters.AddWithValue("@Origin", trains.Origin);
+                    sqlcmd.Parameters.AddWithValue("@ArrivalDateandTime", trains.ArrivalDateandTime);
+                    sqlcmd.Parameters.AddWithValue("@DepartureDateandTime", trains.DepartureDateandTime);
+                    sqlcmd.Parameters.AddWithValue("@SleeperFare", trains.SleeperFare);
+                    sqlcmd.Parameters.AddWithValue("@SleeperAvailableseats", trains.SleeperAvailableSeats);
+                    sqlcmd.Parameters.AddWithValue("@SecondClassACFare", trains.SecondClassACFare);
+                    sqlcmd.Parameters.AddWithValue("@SecondClassAcAvailableseats", trains.SecondClassACAvailableSeats);
+                    sqlcmd.Parameters.AddWithValue("@FirstClassAcFare", trains.FirstClassAcFare);
+                    sqlcmd.Parameters.AddWithValue("@FirstClassACAvailableseats", trains.FirstClassAcAvailableSeats);
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.ExecuteNonQuery();
+                    cn.Close();
+                }
+            }
+            var result = new ArrayList();
+            result.Add("Trains Upated Successfully");
+            return result;
+        }
+        public string DeleteTrain(long trainID)
+        {
+            string conn = config.GetConnectionString("DBConn");
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                using (SqlCommand sqlcmd = new SqlCommand("DeleteTrain", cn))
+                {
+                    cn.Open();
+                    sqlcmd.CommandType = CommandType.StoredProcedure;
+                    sqlcmd.Parameters.AddWithValue("@TrainID", trainID);
+                    var result = "Train is cancelled" + " " + trainID;
+                    sqlcmd.ExecuteNonQuery();
+                    cn.Close();
+                    return result;
+                }
+            }
+        }
+    }
+}
+
