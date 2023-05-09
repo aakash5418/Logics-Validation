@@ -1,0 +1,85 @@
+CREATE TABLE [ttr].[BookingList] (
+    [BookingID]            BIGINT             IDENTITY (20001, 1) NOT NULL,
+    [PassengerID]          BIGINT             NOT NULL,
+    [BookingStatusID]      INT                CONSTRAINT [Df_BookingStatusID] DEFAULT ((1)) NOT NULL,
+    [Fare]                 DECIMAL (10, 2)    NOT NULL,
+    [TrainID]              BIGINT             NOT NULL,
+    [Class]                VARCHAR (50)       NOT NULL,
+    [DepartureDateandtime] DATETIME           DEFAULT (getdate()) NULL,
+    [createdDate]          DATETIMEOFFSET (7) DEFAULT (getdate()) NULL,
+    CONSTRAINT [PK_BookingList_BookingID] PRIMARY KEY CLUSTERED ([BookingID] ASC),
+    CONSTRAINT [FK_BookingList_TrainID] FOREIGN KEY ([TrainID]) REFERENCES [ttr].[TrainList] ([TrainID])
+);
+
+
+
+CREATE TABLE [ttr].[BookingStatus] (
+    [StatusID]     BIGINT        IDENTITY (1, 1) NOT NULL,
+    [StatusName]   VARCHAR (50)  NOT NULL,
+    [CreatedDate]  DATETIME      DEFAULT (getdate()) NULL,
+    [ModifiedDate] DATETIME      NULL,
+    [CreatedBy]    VARCHAR (100) NOT NULL,
+    [ModifiedBy]   VARCHAR (100) NULL,
+    CONSTRAINT [PK_BookingStatus_StatusID] PRIMARY KEY CLUSTERED ([StatusID] ASC)
+);
+
+
+CREATE TABLE [ttr].[PassengerDirectory] (
+    [PassengerID]          BIGINT             IDENTITY (90001, 1) NOT NULL,
+    [Name]                 VARCHAR (100)      NOT NULL,
+    [Age]                  INT                NOT NULL,
+    [Gender]               VARCHAR (10)       NOT NULL,
+    [PhoneNumber]          VARCHAR (10)       NOT NULL,
+    [TrainId]              BIGINT             NOT NULL,
+    [DeparturedateandTime] DATETIMEOFFSET (7) NOT NULL,
+    CONSTRAINT [PK_PassengerDirectory_PassengerID] PRIMARY KEY CLUSTERED ([PassengerID] ASC)
+);
+
+
+CREATE TABLE [ttr].[TicketCancellation] (
+    [CancellationId]   BIGINT          IDENTITY (3001, 1) NOT NULL,
+    [BookingID]        BIGINT          NOT NULL,
+    [CancellationDate] DATETIME        DEFAULT (getdate()) NULL,
+    [ReturnedFare]     DECIMAL (10, 2) NOT NULL,
+    [TrainID]          BIGINT          NULL,
+    CONSTRAINT [FK_TicketCancellation_BookingID] FOREIGN KEY ([BookingID]) REFERENCES [ttr].[BookingList] ([BookingID]),
+    CONSTRAINT [FK_TicketCancellation_TrainID] FOREIGN KEY ([TrainID]) REFERENCES [ttr].[TrainList] ([TrainID])
+);
+
+
+CREATE TABLE [ttr].[TrainList] (
+    [TrainID]                     BIGINT             IDENTITY (10001, 1) NOT NULL,
+    [TrainName]                   VARCHAR (100)      NOT NULL,
+    [Origin]                      VARCHAR (30)       NOT NULL,
+    [Destination]                 VARCHAR (30)       NOT NULL,
+    [ArrivalDateandTime]          DATETIMEOFFSET (7) NOT NULL,
+    [DepartureDateandTime]        DATETIMEOFFSET (7) NOT NULL,
+    [SleeperFare]                 DECIMAL (10, 2)    NOT NULL,
+    [SleeperAvailableSeats]       INT                NOT NULL,
+    [SecondClassACFare]           DECIMAL (10, 2)    NOT NULL,
+    [SecondClassACAvailableSeats] INT                NOT NULL,
+    [FirstClassACFare]            DECIMAL (10, 2)    NOT NULL,
+    [FirstClassACAvailableSeats]  INT                NOT NULL,
+    [SleeperWaitingList]          INT                DEFAULT ((0)) NULL,
+    [SecondACWaitingList]         INT                DEFAULT ((0)) NULL,
+    [FirstACWaitingList]          INT                DEFAULT ((0)) NULL,
+    CONSTRAINT [PK_TrainList_TrainID] PRIMARY KEY CLUSTERED ([TrainID] ASC)
+);
+
+
+CREATE TABLE [ttr].[Users] (
+    [UserID]       BIGINT       IDENTITY (101, 1) NOT NULL,
+    [Name]         VARCHAR (50) NOT NULL,
+    [Gender]       VARCHAR (10) NOT NULL,
+    [Nationality]  VARCHAR (50) NOT NULL,
+    [DateOFBirth]  DATE         NOT NULL,
+    [phonenumber]  VARCHAR (10) NOT NULL,
+    [state]        VARCHAR (50) NOT NULL,
+    [city]         VARCHAR (50) NOT NULL,
+    [EmailID]      VARCHAR (40) NOT NULL,
+    [Password]     VARCHAR (30) NOT NULL,
+    [CreatedDate]  DATETIME     DEFAULT (getdate()) NULL,
+    [ModifiedDate] DATETIME     NULL,
+    CONSTRAINT [PK_Users_UserID] PRIMARY KEY CLUSTERED ([UserID] ASC)
+);
+
