@@ -1,0 +1,299 @@
+using Microsoft.AspNetCore.Mvc;
+using TTRSystem.Core.Models;
+using TTRSystem.Service;
+
+namespace TrainTicketReservationSystem.Controllers
+{
+    [Route("api/[controller]")]
+    public class BookingController : Controller
+    {
+        private readonly IBookingService bookingService;
+
+        public BookingController(IBookingService bookingService)
+        {
+            this.bookingService = bookingService;
+        }
+    
+        [HttpGet("GetBookingByTrainID")]
+        public IActionResult GetBookingByTrainID(long trainID, DateTimeOffset date)
+        {
+            try
+            {
+                var result = this.bookingService.GetBookingByTrainID(trainID, date);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while getting Booking by TrainID."));
+            }
+        }
+        [HttpPost("AddBooking")]
+        public IActionResult AddBooking(Passengers passengersDirectory)
+        {
+            try
+            {
+                if (passengersDirectory != null)
+                {
+                    var result = this.bookingService.AddBooking(passengersDirectory);
+                    return Ok(result);
+                }
+                else
+                {
+                    return Ok(new { Error = "Passengers detail is invalid" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while adding Booking"));
+            }
+        }
+        [HttpPost("AddUser")]
+        public IActionResult AddUser(Users users)
+        {
+            try
+            {
+                    var result = this.bookingService.AddUser(users);
+                    return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while adding User"));
+            }
+        }
+        [HttpGet("GetUser")]
+        public IActionResult GetUser(long UserId, string Password)
+        {
+            try
+            {
+                var result = this.bookingService.GetUsers(UserId, Password);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Getting User"));
+            }
+        }
+
+        [HttpGet("GetUserbyUserID")]
+        public IActionResult GetUserbyUserID(long UserId)
+        {
+            try
+            {
+                var result = this.bookingService.GetUserbyUserID(UserId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Getting User by ID"));
+            }
+        }
+        [HttpPut("UpdateUser")]
+        public IActionResult UpdateUser(UpdateUser updateUser)
+        {
+            try
+            {
+                if (updateUser != null)
+                {
+                    var result = this.bookingService.UpdateUser(updateUser);
+                    return Ok(result);
+                }
+                else
+                {
+                    return Ok(new { Error = "updateUser details are invalid" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Updating user."));
+            }
+        }
+        [HttpGet("CheckbookingStatus")]
+        public IActionResult GetBookingByBookingID(long bookingID, long userID, string password)
+        {
+            try
+            {
+                var result = this.bookingService.GetBookingByBookingID(bookingID, userID, password);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while getting Booking by BookingID"));
+            }
+        }
+        [HttpPut("UpdateBookingStatus")]
+        public IActionResult UpdateBookingStatus(long bookingId)
+        {
+            try
+            {
+                var result = this.bookingService.UpdateBookingStatus(bookingId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Updating booking status."));
+            }
+        }
+        [HttpDelete("CancelTicket")]
+        public IActionResult CancelTicket(long bookingID, long userID, string password)
+        {
+            try
+            {
+                var result = this.bookingService.CancelTicket(bookingID, userID, password);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Cancelling Ticket"));
+            }
+        }
+        [HttpGet("GetCancelledTicketByTrainID")]
+        public IActionResult GetCancelledTicketByTrainID(long trainID)
+        {
+            try
+            {
+                var result = this.bookingService.GetCancelledTicketByTrainID(trainID);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while  Getting Canceleed Ticket"));
+            }
+        }
+    }
+}
+
+
+
+
+
+using Microsoft.AspNetCore.Mvc;
+using TTRSystem.Core.Models;
+using TTRSystem.Service;
+
+namespace TrainTicketReservationSystem.Controllers
+{
+    [Route("api/[controller]")]
+    public class TrainsController : Controller
+    {
+        private readonly ITrainsService trainsService;
+
+        public TrainsController(ITrainsService trainsService)
+        {
+            this.trainsService = trainsService;
+        }
+
+        [HttpGet("GetTrainsByDate")]
+        public IActionResult GetTrainsByDate(DateTimeOffset? date)
+        {
+            try
+            {
+                var result = this.trainsService.GetTrainsByDate(date);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while getting Trains By Date."));
+            }
+        }
+        [HttpGet("GetTrainsByDesignation")]
+        public IActionResult GetTrainsByDestination(string? Destination)
+        {
+            try
+            {
+                var result = this.trainsService.GetTrainsByDestination(Destination);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while getting TrainsByDestination"));
+            }
+        }
+        [HttpGet("GetTrainsByOrigin")]
+        public IActionResult GetTrainsByOrigin(string? origin)
+        {
+            try
+            {
+                var result = this.trainsService.GetTrainsByOrigin(origin);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while getting Trains By Origin."));
+            }
+        }
+        [HttpGet("GetTrainsByOriginAndDesignation")]
+        public IActionResult GetTrainsByOriginAndDestination(string? Origin, string? Destination, DateTimeOffset? Departuredate)
+        {
+            try
+            {
+                var result = this.trainsService.GetTrainsByOriginAndDestination(Origin, Destination, Departuredate);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while getting Trains By Origin And Destination."));
+            }
+        }
+        [HttpGet("GetTrainsByName")]
+        public IActionResult GetTrainsByName(string? TrainName)
+        {
+            try
+            {
+                var result = this.trainsService.GetTrainsByName(TrainName);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while getting Trains By Name."));
+            }
+        }
+        [HttpPost("AddTrains")]
+        public IActionResult AddTrains([FromBody] Trains trains)
+        {
+            try
+            {
+                if (trains != null)
+                {
+                    var result = this.trainsService.AddTrain(trains);
+                    return Ok(result);
+                }
+                else
+                {
+                    return Ok(new { Error = "train details is invalid" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Adding Trains"));
+            }
+        }
+        [HttpPut("UpdateTrains")]
+        public IActionResult UpdateTrains([FromBody] Trains trains)
+        {
+            try
+            {
+                var result = this.trainsService.UpdateTrain(trains);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Updating Trains "));
+            }
+        }
+        [HttpDelete("DeleteTrains")]
+        public IActionResult DeleteTrains(long TrainID)
+        {
+            try
+            {
+                var result = this.trainsService.DeleteTrain(TrainID);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, (ex, "An error occurred while Deleting Trains"));
+            }
+        }
+
+    }
+}
