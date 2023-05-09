@@ -1,0 +1,743 @@
+CREATE Procedure AddTrain  @TrainName varchar(100), @Destination varchar(100), @Origin varchar(100), @ArrivalDateandTime Datetimeoffset, @DepartureDateandTime datetimeoffset, @Sleeperfare decimal(10,2), @Sleeperavailableseats Int ,  @SecondClassACFare decimal(10,2),@SecondClassAcAvailableseats int, @FirstClassAcFare decimal(10,2),@FirstClassACAvailableseats int
+as       
+BEGIN    
+IF NOT EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.TrainName  = @TrainName AND DepartureDateandTime = @DepartureDateandTime AND ArrivalDateandTime = @ArrivalDateandTime)      
+BEGIN 
+INSERT INTO [ttr].[TrainList] (TrainName,Destination, Origin,ArrivalDateandTime,DepartureDateandTime, SleeperFare, SleeperAvailableseats, SecondClassACFare, SecondClassAcAvailableseats, FirstClassAcFare, FirstClassACAvailableseats)
+values (@TrainName,@Destination, @Origin,@ArrivalDateandTime,@DepartureDateandTime, @SleeperFare, @SleeperAvailableseats, @SecondClassACFare, @SecondClassAcAvailableseats, @FirstClassAcFare,@FirstClassACAvailableseats)
+SELECT TrainID = SCOPE_IDENTITY()
+END
+END
+
+
+CREATE PROCEDURE CheckUserbyPhonenumber @Phonenumber Varchar(10)
+as
+Begin
+Select UserID from [ttr].[Users] 
+where phonenumber = @Phonenumber
+end
+
+
+CREATE Procedure CreateUser @Name VARCHAR(50), @Gender varchar(10),@nationality varchar(50), @DateofBirth date, @Phonenumber varchar(10),@state varchar(50),@city Varchar(50), @EmailID Varchar(40),@Password varchar(30)
+as    
+BEGIN    
+Insert into [ttr].[Users] (Name,Gender,Nationality,Dateofbirth,Phonenumber,State,City,EmailiD,Password,CreatedDate)
+Values (@Name,@Gender,@nationality,@DateofBirth,@Phonenumber,@state,@city,@EmailID,@Password,Getdate())
+  SELECT UserID = SCOPE_IDENTITY()
+END
+
+
+CREATE Procedure DeleteTrain  @TrainID BIGINT
+as       
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.TrainID  = @TrainID)  
+BEGIN 
+Delete from [ttr].[TrainList]
+where TrainId = @trainID
+END
+END
+
+
+CREATE Procedure GetBookingbyBookingID   @BookingID BIGINT
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[bookingList] ttrs
+WHERE ttrs.BookingID  = @BookingID)   
+BEGIN 
+SELECT ttrs.BookingID,PD.Name,tl.TrainName,ttrs.BookingStatusID,ttrs.DepartureDateandTime,ttrs.class,ttrs.fare
+FROM  [ttr].[bookingList] ttrs
+INNER JOIN [TTR].[PassengerDirectory] PD
+ON ttrs.PassengerID = PD.PassengerID
+INNER JOIN [TTR].[TrainList] TL
+ON PD.TrainID = TL.TrainID
+WHERE ttrs.BookingID  = @BookingID
+END
+END
+
+
+CREATE Procedure GetBookingbyTrainID    @TrainID BIGINT, @DepartureDate Date 
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE CAST(ttrs.DepartureDateandTime AS Date)  = @DepartureDate AND TrainID = @TrainID)    
+BEGIN 
+SELECT ttrs.BookingID,PD.Name, ttrs.TrainID,ttrs.Class,ttrs.Fare,ttrs.BookingStatusID,ttrs.DepartureDateandTime
+FROM  [ttr].[bookingList] ttrs
+INNER JOIN [TTR].[PassengerDirectory] PD
+ON ttrs.PassengerID = PD.PassengerID
+WHERE CAST(ttrs.DepartureDateandTime AS DATE) = @DepartureDate AND ttrs.TrainID = @TrainID
+END
+END
+
+
+CREATE Procedure GetCancelledTicket  @BookingID Bigint
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[BookingList] ttrs
+WHERE BookingID = @BookingID)   
+BEGIN 
+SELECT BookingID FROM  [ttr].[TicketCancellation] ttrs
+WHERE BookingID = @BookingID   
+END
+END
+
+
+create Procedure GetCancelledTicketByTrainID  @TrainID Bigint null
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE TrainID = isnull(@TrainID, TrainID))    
+BEGIN 
+SELECT ttrs.CancellationId, ttrs.BookingID, ttrs.CancellationDate, ttrs.ReturnedFare,ttrs.TrainID,bk.PassengerID,bk.BookingStatusID,bk.Fare,bk.Class,bk.DepartureDateandtime 
+FROM  [ttr].[TicketCancellation] ttrs
+Inner join [ttr].[BookingList] bk
+on ttrs.BookingID = bk.BookingID
+WHERE ttrs.TrainID = isnull(@TrainID, ttrs.TrainID) 
+END
+END
+
+
+CREATE Procedure GetPassengers  @TrainID Bigint null , @Class varchar(50) null
+as      
+BEGIN      
+If (@TrainID is null AND @Class is null)
+BEGIN
+SELECT PD.PassengerID,PD.Name,PD.Age,PD.Gender,PD.PhoneNumber,PD.TrainId,PD.DeparturedateandTime,BL.BookingID,BL.BookingStatusID,BL.Fare,BL.Class FROM  [ttr].[PassengerDirectory] PD
+INNER JOIN [ttr].[BookingList] BL
+ON PD.PassengerID = BL.PassengerID
+END
+ELSE If (@TrainID > 0 AND @Class is null)
+BEGIN
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs  
+WHERE TrainID = isnull(@TrainID, TrainID))   
+BEGIN
+SELECT PD.PassengerID,PD.Name,PD.Age,PD.Gender,PD.PhoneNumber,PD.TrainId,PD.DeparturedateandTime,BL.BookingID,BL.BookingStatusID,BL.Fare,BL.Class
+FROM  [ttr].[PassengerDirectory] PD
+INNER JOIN [ttr].[BookingList] BL
+ON PD.PassengerID = BL.PassengerID
+Where PD.TrainId = @TrainID  
+END 
+END
+ELSE If (@TrainID is not null AND @Class is NOT NULL)
+BEGIN
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs  
+WHERE TrainID = isnull(@TrainID, TrainID))   
+BEGIN
+SELECT PD.PassengerID,PD.Name,PD.Age,PD.Gender,PD.PhoneNumber,PD.TrainId,PD.DeparturedateandTime,BL.BookingID,BL.BookingStatusID,BL.Fare,BL.Class
+FROM  [ttr].[PassengerDirectory] PD
+INNER JOIN [ttr].[BookingList] BL
+ON PD.PassengerID = BL.PassengerID  
+Where PD.TrainId = @TrainID  AND BL.Class = @Class 
+END 
+END
+END
+
+
+CREATE Procedure GetSeatAvailability    @TrainID BIGINT, @class Varchar(50)
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE TrainID = @TrainID)    
+BEGIN 
+if(@class = 'Sleeper')
+BEGIN
+SELECT SleeperAvailableSeats
+FROM  [ttr].[TrainList] ttrs
+where TrainID = @TrainID
+END
+else if(@class = 'Sleeper')
+BEGIN
+SELECT SleeperAvailableSeats
+FROM  [ttr].[TrainList] ttrs
+where TrainID = @TrainID
+END
+else if(@class = 'Sleeper')
+BEGIN
+SELECT SleeperAvailableSeats
+FROM  [ttr].[TrainList] ttrs
+where TrainID = @TrainID
+END
+END
+END
+
+
+CREATE Procedure GetTrainsByDate  @Date DATE NULL
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@Date,ttrs.DepartureDateandTime))    
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE CAST(ttrs.DepartureDateandTime AS DATE) = ISNULL(@Date,ttrs.DepartureDateandTime)    
+END
+END
+
+
+CREATE Procedure GetTrainsByDestination  @Destination  VARCHAR(30) NULL
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Destination  = ISNULL(@Destination,ttrs.Destination))    
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Destination  = ISNULL(@Destination,ttrs.Destination)   
+END
+END
+
+
+CREATE Procedure GetTrainsByOrigin  @Origin  VARCHAR(30) NULL
+as    
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin))    
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin)    
+END
+END
+
+
+
+CREATE Procedure GetTrainsByOriginandDestination  @Origin  VARCHAR(30) NULL, @Destination VARCHAR(30) NULL, @DepartureDateandtime DateTime NULL
+as    
+BEGIN    
+Declare @DepartureDate Date 
+set @DepartureDate = CAST(@DepartureDateandtime as date)
+if(@Origin is not null) AND (@Destination is not null) AND (@DepartureDate is not null)
+BEGIN
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin) AND ttrs.Destination  = ISNULL(@Destination,ttrs.Destination) AND CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@DepartureDate,ttrs.DepartureDateandTime))  
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin) AND ttrs.Destination  = ISNULL(@Destination,ttrs.Destination)  AND CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@DepartureDate,ttrs.DepartureDateandTime)
+END
+END
+else if(@Origin is not null) AND (@Destination is not null) 
+BEGIN
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin) AND ttrs.Destination  = ISNULL(@Destination,ttrs.Destination))
+BEGIN
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin) AND ttrs.Destination  = ISNULL(@Destination,ttrs.Destination)
+END
+END
+else if(@Origin is not null) AND (@DepartureDate is not null) 
+BEGIN
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin) AND CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@DepartureDate,ttrs.DepartureDateandTime)) 
+BEGIN
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin) AND CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@DepartureDate,ttrs.DepartureDateandTime)
+END
+END
+else if(@Destination is not null) AND (@DepartureDate is not null) 
+BEGIN
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Destination  = ISNULL(@Destination,ttrs.Destination) AND CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@DepartureDate,ttrs.DepartureDateandTime)) 
+BEGIN
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Destination  = ISNULL(@Destination,ttrs.Destination) AND CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@DepartureDate,ttrs.DepartureDateandTime)
+END
+END
+ELSE IF (@Origin is not null)
+BEGIN 
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin))    
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Origin  = ISNULL(@Origin,ttrs.Origin)    
+END
+END
+ELSE IF (@Destination is not null)
+BEGIN  
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.Destination  = ISNULL(@Destination,ttrs.Destination))    
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE ttrs.Destination  = ISNULL(@Destination,ttrs.Destination)   
+END
+END
+else
+BEGIN  
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE CAST(ttrs.DepartureDateandTime AS Date)  = ISNULL(@DepartureDate,ttrs.DepartureDateandTime))    
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE CAST(ttrs.DepartureDateandTime AS DATE) = ISNULL(@DepartureDate,ttrs.DepartureDateandTime)    
+END
+END
+END
+
+
+
+
+CREATE Procedure GetTrainsByTrainID  @TrainID bigint null  
+as         
+BEGIN      
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs  
+WHERE ttrs.TrainID  = @TrainID)      
+BEGIN   
+SELECT * FROM  [ttr].[TrainList] ttrs  
+WHERE ttrs.TrainID  = @TrainID 
+END  
+END
+
+
+CREATE Procedure GetTrainsByTrainName  @TrainName VARCHAR(100) NULL
+as       
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.TrainName  = ISNULL(@TrainName,ttrs.TrainName))    
+BEGIN 
+SELECT * FROM  [ttr].[TrainList] ttrs
+WHERE TrainName = ISNULL(@TrainName,ttrs.TrainName)
+END
+END
+
+
+CREATE PROCEDURE GetUser @UserID Bigint, @Password Varchar(30)
+as
+Begin
+Select * from [ttr].[Users] 
+where UserId = @UserID AND Password = @Password
+end
+
+
+CREATE Procedure GetUserbyUserID  @UserID bigint  
+as      
+BEGIN      
+IF EXISTS (SELECT * FROM [ttr].[users] ttrs  
+WHERE UserID = isnull(@UserID, UserID))      
+BEGIN   
+SELECT * FROM  [ttr].[Users] ttrs  
+WHERE UserID = isnull(@UserID, UserID)  
+END  
+END 
+
+
+
+
+
+CREATE PROCEDURE TicketCancellation @BookingID BIGINT
+AS
+BEGIN
+	IF EXISTS (
+			SELECT *
+			FROM [ttr].[bookingList] ttrs
+			WHERE ttrs.BookingID = @BookingID
+			)
+	BEGIN
+		IF NOT EXISTS (
+				SELECT *
+				FROM [ttr].[TicketCancellation]
+				WHERE BookingID = @BookingID
+				)
+		BEGIN
+			DECLARE @DepartureDate DATETIME
+				,@CancellationDate DATETIME = GetDate()
+				,@Fare DECIMAL(10, 2)
+				,@days_difference INT
+				,@returnfare DECIMAL(10, 2)
+				,@TrainID BIGINT
+				,@Class VARCHAR(100)
+				,@Waitinglistperson BIGINT
+				,@SleeperWaitingList INT
+				,@SecondACWaitingList INT
+				,@FirstACWaitingList INT
+				,@bookingStatusID INT
+
+			SELECT @DepartureDate = DepartureDateandtime
+				,@fare = Fare
+				,@trainID = trainid
+				,@Class = Class
+				,@bookingStatusID = BookingStatusID
+			FROM [ttr].[bookingList]
+			WHERE BookingID = @BookingID
+
+			IF (@DepartureDate > @CancellationDate)
+			BEGIN
+				SELECT @days_difference = DATEDIFF(Hour, @CancellationDate, @DepartureDate)
+
+				IF @days_difference >= 48
+				BEGIN
+					SET @returnfare = @fare * 0.9
+				END
+				ELSE IF @days_difference >= 24
+				BEGIN
+					SET @returnfare = @fare * 0.5
+				END
+				ELSE
+				BEGIN
+					SET @returnfare = 0.00
+				END
+
+				INSERT INTO [TTR].[TicketCancellation] (
+					bookingid
+					,CancellationDate
+					,ReturnedFare
+					,TrainID
+					)
+				VALUES (
+					@BookingID
+					,@CancellationDate
+					,@returnfare
+					,@TrainID
+					)
+
+				UPDATE [ttr].[bookingList]
+				SET BookingStatusID = 3
+				WHERE BookingID = @BookingID
+
+				IF (@bookingStatusID != 1)
+				BEGIN
+					SELECT TOP 1 @Waitinglistperson = BookingID
+					FROM [ttr].[bookingList]
+					WHERE TrainID = @TrainID
+						AND Class = @Class
+						AND BookingStatusID = 1
+					ORDER BY BookingID ASC
+
+					SELECT @SleeperWaitingList = SleeperWaitingList
+						,@SecondACWaitingList = SecondACWaitingList
+						,@FirstACWaitingList = FirstACWaitingList
+					FROM [ttr].[TrainList]
+					WHERE TrainID = @TrainID
+
+					IF (@Class = 'Sleeper')
+					BEGIN
+						IF (@SleeperWaitingList > 0)
+						BEGIN
+							UPDATE [ttr].[bookingList]
+							SET BookingStatusID = 2
+							WHERE BookingID = @Waitinglistperson
+
+							UPDATE [ttr].[TrainList]
+							SET SleeperWaitingList = SleeperWaitingList - 1
+							WHERE TrainID = @TrainID
+						END
+						ELSE
+						BEGIN
+							UPDATE [ttr].[TrainList]
+							SET SleeperAvailableSeats = SleeperAvailableSeats + 1
+							WHERE TrainID = @TrainID
+						END
+					END
+					ELSE IF (@Class = 'SecondAC')
+					BEGIN
+						IF (@SecondACWaitingList > 0)
+						BEGIN
+							UPDATE [ttr].[bookingList]
+							SET BookingStatusID = 2
+							WHERE BookingID = @Waitinglistperson
+
+							UPDATE [ttr].[TrainList]
+							SET SecondACWaitingList = SecondACWaitingList - 1
+							WHERE TrainID = @TrainID
+						END
+						ELSE
+						BEGIN
+							UPDATE [ttr].[TrainList]
+							SET SecondClassAcAvailableSeats = SecondClassAcAvailableSeats + 1
+							WHERE TrainID = @TrainID
+						END
+					END
+					ELSE IF (@Class = 'FirstAC')
+					BEGIN
+						IF (@FirstACWaitingList > 0)
+						BEGIN
+							UPDATE [ttr].[bookingList]
+							SET BookingStatusID = 2
+							WHERE BookingID = @Waitinglistperson
+
+							UPDATE [ttr].[TrainList]
+							SET FirstACWaitingList = FirstACWaitingList - 1
+							WHERE TrainID = @TrainID
+						END
+						ELSE
+						BEGIN
+							UPDATE [ttr].[TrainList]
+							SET FirstClassACAvailableSeats = FirstClassACAvailableSeats + 1
+							WHERE TrainID = @TrainID
+						END
+					END
+				END
+				ELSE
+				BEGIN
+					IF (@CLASS = 'Sleeper')
+					BEGIN
+						UPDATE [ttr].[TrainList]
+						SET SleeperWaitingList = SleeperWaitingList - 1
+						WHERE TrainID = @TrainID
+					END
+					ELSE IF (@CLASS = 'SecondAC')
+					BEGIN
+						UPDATE [ttr].[TrainList]
+						SET SecondACWaitingList = SecondACWaitingList - 1
+						WHERE TrainID = @TrainID
+					END
+					ELSE IF (@CLASS = 'FirstAC')
+					BEGIN
+						UPDATE [ttr].[TrainList]
+						SET FirstACWaitingList = FirstACWaitingList - 1
+						WHERE TrainID = @TrainID
+					END
+				END
+				SELECT returnedFare = @returnfare
+			END
+		END
+	END
+END
+
+
+
+
+Create Procedure UpdateBookingStatus @BookingID Bigint
+as
+BEGIN
+IF EXISTS (SELECT * FROM [ttr].[bookingList] ttrs
+WHERE ttrs.BookingID  = @BookingID)   
+BEGIN 
+UPDATE [ttr].[bookingList] 
+SET BookingStatusID = 2 
+WHERE BookingID  = @BookingID
+END
+END
+
+
+CREATE Procedure UpdateTrain  @TrainID bigint , @TrainName varchar(100)null, @Destination varchar(100)null, @Origin varchar(100)null, @ArrivalDateandTime Datetimeoffset null, @DepartureDateandTime datetimeoffset null, @Sleeperfare decimal(10,2) null, @Sleeperavailableseats Int null,  @SecondClassACFare decimal(10,2) null,@SecondClassAcAvailableseats int null, @FirstClassAcFare decimal(10,2) null,@FirstClassACAvailableseats int null
+as       
+BEGIN    
+IF EXISTS (SELECT * FROM [ttr].[TrainList] ttrs
+WHERE ttrs.TrainID  = @TrainID)  
+BEGIN 
+Update [ttr].[trainlIst]
+set TrainName = @trainName,Destination = @Destination, Origin = @Origin,ArrivalDateandTime =@ArrivalDateandTime,DepartureDateandTime = @DepartureDateandTime, SleeperFare = @Sleeperfare, SleeperAvailableseats = @Sleeperavailableseats, SecondClassACFare = @SecondClassACFare, SecondClassAcAvailableseats = @SecondClassAcAvailableseats, FirstClassAcFare = @FirstClassAcFare, FirstClassACAvailableseats = @FirstClassACAvailableseats
+Where TrainID = @TrainID
+END
+END   
+
+
+
+CREATE Procedure UpdateUser   @UserID Bigint , @Password Varchar(30) = null, @Name VARCHAR(50) =null, @Gender varchar(10)=null,@nationality varchar(50)=null, @DateofBirth date =null, @Phonenumber varchar(10)=null,@state varchar(50)=null,@city Varchar(50)=null, @EmailID Varchar(40)=null  
+as      
+BEGIN      
+IF EXISTS (SELECT * FROM [ttr].[Users] ttrs  
+WHERE ttrs.UserID = @UserID )      
+BEGIN   
+if @Password is not null
+BEGIN
+update [ttr].[Users]  
+set Password = @Password
+where UserID = @UserID
+END
+if @Name is not null
+BEGIN
+update [ttr].[Users]  
+set Name = @Name
+where UserID = @UserID
+END
+if @Gender is not null
+BEGIN
+update [ttr].[Users]  
+set Gender = @Gender
+where UserID = @UserID
+END
+if @nationality is not null
+BEGIN
+update [ttr].[Users]  
+set Nationality= @nationality
+where UserID = @UserID
+END
+if (@DateofBirth is not null)
+BEGIN
+update [ttr].[Users]  
+set Dateofbirth = @DateofBirth
+where UserID = @UserID
+END
+if @Phonenumber is not null
+BEGIN
+update [ttr].[Users]  
+set Phonenumber =@Phonenumber
+where UserID = @UserID
+END
+if @state is not null
+BEGIN
+update [ttr].[Users]  
+set State = @state
+where UserID = @UserID
+END
+if @city is not null
+BEGIN
+update [ttr].[Users]  
+set City= @city
+where UserID = @UserID
+END
+if @EmailID is not null
+BEGIN
+update [ttr].[Users]  
+set EmailiD = @EmailID
+where UserID = @UserID
+END
+update [ttr].[Users]  
+set ModifiedDate = GETDATE()
+where UserID = @UserID
+END  
+END
+
+
+
+
+
+
+CREATE Procedure UpsertBooking  @Name VARCHAR(100), @Age INT, @Gender VARCHAR(10), @Phonenumber VARCHAR(10), @TrainID Bigint, @Class Varchar(50)    
+as        
+BEGIN        
+Declare @PassengerID bigint = 1, @NewPassengerID bigint, @SleeperSeatAvailable int, @fare int,@SecondClassAcSeatAvailable int, @FirstClassAcSeatAvailable int, @DepartureDate DateTime, @BookingiD bigint    
+    
+If Exists(Select * From [ttr].[TrainList] where trainId = @TrainID)    
+BEGIN    
+Select @SleeperSeatAvailable = SleeperAvailableseats, @SecondClassAcSeatAvailable = SecondClassACAvailableSeats, @FirstClassAcSeatAvailable = FirstClassACAvailableSeats
+ from [ttr].[TrainList] where trainId = @TrainID    
+If (@Class = 'Sleeper')    
+BEGIN    
+  
+if(@SleeperSeatAvailable > 0)    
+BEGIN    
+Select @Fare = Sleeperfare, @DepartureDate = DepartureDateandTime     
+from [ttr].[TrainList]    
+where TrainID = @TrainID    
+If NOT EXISTS (Select * from [ttr].[PassengerDirectory] where Name = @Name AND TrainId = @TrainID AND @DepartureDate = @DepartureDate AND AGE = @Age and GENDER = @GENDER)    
+BEGIN     
+Insert INTO [ttr].[PassengerDirectory] (Name,Age,Gender,PhoneNumber,TrainID,DepartureDateandTime)    
+VALUES(@Name,@Age,@Gender,@Phonenumber,@TrainID,@DepartureDate)    
+Set @NewPassengerID = SCOPE_IDENTITY()    
+Insert into [ttr].[BookingList] (PassengerID,Fare,TrainID,Class,DepartureDateandtime,BookingStatusID)    
+Values(@NewPassengerID,@Fare,@TrainID,@Class,@DepartureDate,2)    
+Set @BookingiD = SCOPE_IDENTITY()    
+Update [ttr].[TrainList]     
+set SleeperAvailableSeats = SleeperAvailableSeats - 1    
+Where TrainID = @TrainID    
+END    
+END    
+ELSE  
+BEGIN    
+Select @Fare = Sleeperfare, @DepartureDate = DepartureDateandTime     
+from [ttr].[TrainList]    
+where TrainID = @TrainID    
+If NOT EXISTS (Select * from [ttr].[PassengerDirectory] where Name = @Name AND TrainId = @TrainID AND @DepartureDate = @DepartureDate AND AGE = @Age and GENDER = @GENDER)    
+BEGIN     
+Insert INTO [ttr].[PassengerDirectory] (Name,Age,Gender,PhoneNumber,TrainID,DepartureDateandTime)    
+VALUES(@Name,@Age,@Gender,@Phonenumber,@TrainID,@DepartureDate)    
+Set @NewPassengerID = SCOPE_IDENTITY()    
+Insert into [ttr].[BookingList] (PassengerID,Fare,TrainID,Class,DepartureDateandtime)    
+Values(@NewPassengerID,@Fare,@TrainID,@Class,@DepartureDate)    
+Set @BookingiD = SCOPE_IDENTITY()    
+Update [ttr].[TrainList]     
+set SleeperWaitingList = SleeperWaitingList + 1    
+Where TrainID = @TrainID    
+END   
+END  
+  
+END    
+ELSE If (@Class = 'SecondAC')    
+BEGIN    
+if(@SecondClassAcSeatAvailable > 0)    
+BEGIN    
+Select @Fare = SecondClassAcFare , @DepartureDate = DepartureDateandTime     
+from [ttr].[TrainList]    
+where TrainID = @TrainID    
+If NOT EXISTS (Select * from [ttr].[PassengerDirectory] where Name = @Name AND TrainId = @TrainID AND @DepartureDate = @DepartureDate)    
+BEGIN     
+Insert INTO [ttr].[PassengerDirectory] (Name,Age,Gender,PhoneNumber,TrainID,DepartureDateandTime)    
+VALUES(@Name,@Age,@Gender,@Phonenumber,@TrainID,@DepartureDate)    
+Set @NewPassengerID = SCOPE_IDENTITY()    
+Insert into [ttr].[BookingList] (PassengerID,Fare,TrainID,Class,DepartureDateandtime,BookingStatusID)    
+Values(@NewPassengerID,@Fare,@TrainID,@Class,@DepartureDate,2)    
+Set @BookingiD = SCOPE_IDENTITY()    
+Update [ttr].[TrainList]     
+set SecondClassACAvailableSeats = SecondClassACAvailableSeats - 1    
+Where TrainID = @TrainID    
+END    
+END    
+ELSE  
+BEGIN    
+Select @Fare = SecondClassAcFare, @DepartureDate = DepartureDateandTime     
+from [ttr].[TrainList]    
+where TrainID = @TrainID    
+If NOT EXISTS (Select * from [ttr].[PassengerDirectory] where Name = @Name AND TrainId = @TrainID AND @DepartureDate = @DepartureDate AND AGE = @Age and GENDER = @GENDER)    
+BEGIN     
+Insert INTO [ttr].[PassengerDirectory] (Name,Age,Gender,PhoneNumber,TrainID,DepartureDateandTime)    
+VALUES(@Name,@Age,@Gender,@Phonenumber,@TrainID,@DepartureDate)    
+Set @NewPassengerID = SCOPE_IDENTITY()    
+Insert into [ttr].[BookingList] (PassengerID,Fare,TrainID,Class,DepartureDateandtime)    
+Values(@NewPassengerID,@Fare,@TrainID,@Class,@DepartureDate)    
+Set @BookingiD = SCOPE_IDENTITY()    
+Update [ttr].[TrainList]     
+set SecondACWaitingList = SecondACWaitingList + 1    
+Where TrainID = @TrainID    
+END   
+END  
+  
+END    
+ELSE If (@Class = 'FirstAC')    
+BEGIN    
+if(@FirstClassAcSeatAvailable > 0)    
+BEGIN    
+Select @Fare = FirstClassAcFare, @DepartureDate = DepartureDateandTime     
+from [ttr].[TrainList]    
+where TrainID = @TrainID    
+If NOT EXISTS (Select * from [ttr].[PassengerDirectory] where Name = @Name AND TrainId = @TrainID AND @DepartureDate = @DepartureDate)    
+BEGIN     
+Insert INTO [ttr].[PassengerDirectory] (Name,Age,Gender,PhoneNumber,TrainID,DepartureDateandTime)    
+VALUES(@Name,@Age,@Gender,@Phonenumber,@TrainID,@DepartureDate)    
+Set @NewPassengerID = SCOPE_IDENTITY()    
+Insert into [ttr].[BookingList] (PassengerID,Fare,TrainID,Class,DepartureDateandtime,BookingStatusID)    
+Values(@NewPassengerID,@Fare,@TrainID,@Class,@DepartureDate,2)    
+Set @BookingiD = SCOPE_IDENTITY()    
+Update [ttr].[TrainList]     
+set FirstClassACAvailableSeats = FirstClassACAvailableSeats - 1    
+Where TrainID = @TrainID    
+END    
+END    
+ELSE  
+BEGIN    
+Select @Fare = FirstClassAcFare, @DepartureDate = DepartureDateandTime     
+from [ttr].[TrainList]    
+where TrainID = @TrainID    
+If NOT EXISTS (Select * from [ttr].[PassengerDirectory] where Name = @Name AND TrainId = @TrainID AND @DepartureDate = @DepartureDate AND AGE = @Age and GENDER = @GENDER)    
+BEGIN     
+Insert INTO [ttr].[PassengerDirectory] (Name,Age,Gender,PhoneNumber,TrainID,DepartureDateandTime)    
+VALUES(@Name,@Age,@Gender,@Phonenumber,@TrainID,@DepartureDate)    
+Set @NewPassengerID = SCOPE_IDENTITY()    
+Insert into [ttr].[BookingList] (PassengerID,Fare,TrainID,Class,DepartureDateandtime)    
+Values(@NewPassengerID,@Fare,@TrainID,@Class,@DepartureDate)    
+Set @BookingiD = SCOPE_IDENTITY()    
+Update [ttr].[TrainList]     
+set FirstACWaitingList = FirstACWaitingList + 1    
+Where TrainID = @TrainID    
+END   
+END  
+END    
+Select @BookingiD    
+END    
+END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
